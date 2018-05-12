@@ -171,7 +171,8 @@ begin
     drawwall(bl.cx, bl.cy, colorid(bl.id.cl))
   else
     drawwall(bl.cx, bl.cy, wallcolor);
-  graphabc.DrawTextCentered(round((bl.cx  + dx) * blocksize * scale), round((bl.cy + dy) * blocksize * scale), round(((bl.cx + dx)  * blocksize + blocksize) * scale), round((bl.cy * blocksize + dy + blocksize) * scale), toabc(bl.num));
+  graphabc.setbrushcolor(argb(0,0,0,0));
+  graphabc.TextOut(round((bl.cx  + dx) * blocksize * scale), round((bl.cy + dy) * blocksize * scale), toabc(bl.num));
 end;
 
 procedure drawplayer(const bl: player);
@@ -179,7 +180,8 @@ begin
   graphabc.SetBrushHatch(bhNarrowHorizontal);
   graphabc.SetHatchBrushBackgroundColor(colorid(bl.cl));
   graphabc.FillRoundRect(round((bl.cx + dx) * blocksize * scale), round((bl.cy  + dy) * blocksize * scale), round(((bl.cx  + dx) * blocksize + blocksize) * scale), round(((bl.cy  + dy) * blocksize + blocksize) * scale), round(blocksize / 4 * scale), round(blocksize / 4 * scale));
-  graphabc.DrawTextCentered(round((bl.cx  + dx) * blocksize * scale), round((bl.cy + dy) * blocksize * scale), round(((bl.cx + dx)  * blocksize + blocksize) * scale), round((bl.cy * blocksize + dy + blocksize) * scale), toabc(bl.num));
+  graphabc.setbrushcolor(argb(0,0,0,0));
+  graphabc.TextOut(round((bl.cx  + dx) * blocksize * scale), round((bl.cy + dy) * blocksize * scale), toabc(bl.num));
 end;
 
 procedure background;
