@@ -1,0 +1,618 @@
+uses graphabc;
+
+const
+  ///перерыв
+  sleeptime = 0;
+  ///количество игроков
+  playerscount =5;
+  ///границы
+  minx = 1;
+  ///--
+  miny = 1;
+  ///--
+  maxx = 18;
+  ///--
+  maxy = 21;
+  ///количество цветов
+  maxcolor = 10;
+  ///алфавит
+  alphabet = 'abcdefghijklmnopqrstuvwxyz';
+  ///основание системы счисления
+  n = length(alphabet);
+  ///цвет стены
+  wallcolor = graphabc.clRed;
+
+var
+  blocksize: integer := 15;
+  ///смещение по горизонтали
+  dx: integer := 2;
+  ///смещение по вертикали
+  dy: integer := 2;
+  ///увеличение
+  scale: real := 1;
+  ///события
+  keyesc, keya, keyw, keys, keyd, keyleft, keyright, keyup, keydown: boolean;
+
+///функция превращения числа в цвет
+function colorid(const i: integer): color;
+begin
+  case i of
+    1: colorid := graphabc.rgb(220, 20, 60);
+    2: colorid := graphabc.rgb(0, 250, 154);
+    3: colorid := graphabc.rgb(106, 90, 205);
+    4: colorid := graphabc.rgb(244, 164, 96);
+    5: colorid := graphabc.rgb(135, 206, 250);
+    6: colorid := graphabc.rgb(154, 205, 50);
+    7: colorid := graphabc.rgb(244, 164, 96);
+    8: colorid := graphabc.rgb(255, 218, 185);
+    9: colorid := graphabc.rgb(32, 178, 170);
+    10: colorid := graphabc.rgb(72, 61, 139);
+  end;
+end;
+
+
+///преобразование 10-я система счисления - n-я система счисления
+function toabc(i: integer): string;
+var
+  s: string;//строка ответа
+  f: boolean;
+begin
+  f := true;
+  while (i <> 0) or f do//пока не ноль
+  begin
+    f := false;
+    if i mod n >= 0 then//если ещё делим дальше
+      f := true;
+    s += copy(alphabet, i mod n + 1, 1);//добавляем букву
+    i := i div n;//убираем добавленное
+    if f then//если продолжаем делить
+      i -= 1;//уменьшаем параметр
+  end;
+  delete(s, length(s), 1);//удаляем лишнюю а
+  for var ii := 1 to length(s) div 2 do//поворот строки
+    swap(s[ii], s[length(s) - ii + 1]);
+  toabc := s;
+end;
+
+type
+  ///игрок
+  player = class
+    ///цвет
+    cl: integer;
+    ///координата горизонтали
+    cx: integer;
+    ///координата вертикали
+    cy: integer;
+    ///число на блоке
+    num: integer;
+    ///живость
+    alive: boolean;
+    constructor(const ncx, ncy, nnum, ncl: integer);
+    begin
+      cx := ncx;
+      cy := ncy;
+      num := nnum;
+      cl := ncl;
+      alive := true;
+    end;
+  end;
+  ///блок поля.
+  block = class
+    ///координата горизонтали
+    cx: integer;
+    ///координата вертикали
+    cy: integer;
+    ///число на блоке
+    num: integer;
+    ///владелец
+    id: player;
+    constructor(const ncx, ncy, nnum: integer; const nid: player);
+    begin
+      cx := ncx;
+      cy := ncy;
+      num := nnum;
+      id := nid;
+    end;
+  end;
+  ablocks = array of block;
+  aplayers = array of player;
+  array_1_4_of_boolean = array [1..4] of boolean;
+  array_1_4_of_integer = array [1..4] of integer;
+  aw = array [1..4] of array of array [1..2] of integer;
+  am = array [1..4] of array [minx..maxx, miny..maxy] of boolean;
+
+var
+  ///блоки поля
+  blocks: ablocks;
+  ///игроки
+  players: aplayers;
+  ///размер блоков
+
+procedure prkeydown(const key: integer);
+begin
+  case key of
+    27: keyesc := true;
+    65: keya := true;
+    87: keyw := true;
+    83: keys := true;
+    68: keyd := true;
+    37: keyleft := true;
+    39: keyright := true;
+    38: keyup := true;
+    40: keydown := true;
+  end;
+end;
+
+procedure prkeyup(const key: integer);
+begin
+  case key of
+    27: keyesc := false;
+    65: keya := false;
+    87: keyw := false;
+    83: keys := false;
+    68: keyd := false;
+    37: keyleft := false;
+    39: keyright := false;
+    38: keyup := false;
+    40: keydown := false;
+  end;
+end;
+
+procedure drawwall(const cx, cy: integer; const cl: graphabc.color);
+begin
+  graphabc.SetBrushHatch(bhDiagonalBrick);
+  graphabc.SetHatchBrushBackgroundColor(cl);
+  graphabc.FillRoundRect(round((cx + dx) * blocksize * scale), round((cy  + dy) * blocksize * scale), round(((cx  + dx) * blocksize + blocksize) * scale), round(((cy  + dy) * blocksize + blocksize) * scale), round(blocksize / 4 * scale), round(blocksize / 4 * scale));
+end;
+
+procedure drawblock(const bl: block);
+begin
+  if bl.id.alive then
+    drawwall(bl.cx, bl.cy, colorid(bl.id.cl))
+  else
+    drawwall(bl.cx, bl.cy, wallcolor);
+  graphabc.DrawTextCentered(round((bl.cx  + dx) * blocksize * scale), round((bl.cy + dy) * blocksize * scale), round(((bl.cx + dx)  * blocksize + blocksize) * scale), round((bl.cy * blocksize + dy + blocksize) * scale), toabc(bl.num));
+end;
+
+procedure drawplayer(const bl: player);
+begin
+  graphabc.SetBrushHatch(bhNarrowHorizontal);
+  graphabc.SetHatchBrushBackgroundColor(colorid(bl.cl));
+  graphabc.FillRoundRect(round((bl.cx + dx) * blocksize * scale), round((bl.cy  + dy) * blocksize * scale), round(((bl.cx  + dx) * blocksize + blocksize) * scale), round(((bl.cy  + dy) * blocksize + blocksize) * scale), round(blocksize / 4 * scale), round(blocksize / 4 * scale));
+  graphabc.DrawTextCentered(round((bl.cx  + dx) * blocksize * scale), round((bl.cy + dy) * blocksize * scale), round(((bl.cx + dx)  * blocksize + blocksize) * scale), round((bl.cy * blocksize + dy + blocksize) * scale), toabc(bl.num));
+end;
+
+procedure background;
+begin
+  graphabc.SetBrushHatch(bhDottedGrid);
+  graphabc.SetHatchBrushBackgroundColor(graphabc.clWhite);
+  graphabc.fillrectangle(0, 0, graphabc.windowwidth, graphabc.windowheight);
+  for var i := minx - 1 to maxx + 1 do
+  begin
+    drawwall(i, miny - 1, wallcolor);
+    drawwall(i, maxy + 1, wallcolor);
+  end;
+  for var i := miny - 1 to maxy + 1 do
+  begin
+    drawwall(minx - 1, i, wallcolor);
+    drawwall(maxx + 1, i, wallcolor);
+  end;
+end;
+
+function pow(const x, y: integer): integer;
+var
+  r: integer;
+begin
+  r := 1;
+  for var i := 1 to y do
+    r := r * x;
+  pow := r;
+end;
+
+function findmovements(const pl: player; const blocks: ablocks; const players: aplayers): array_1_4_of_boolean;
+var
+  i: integer;
+  a: array_1_4_of_boolean := (pl.cy - 1 >= miny, pl.cx - 1 >= minx, pl.cx + 1 <= maxx, pl.cy + 1 <= maxy);
+begin
+  for i := 0 to length(blocks) - 1 do
+  begin
+    if (blocks[i].cx = pl.cx) and (blocks[i].cy = pl.cy - 1) then
+      a[1] := false;
+    if (blocks[i].cx = pl.cx) and (blocks[i].cy = pl.cy + 1) then
+      a[4] := false;
+    if (blocks[i].cx = pl.cx - 1) and (blocks[i].cy = pl.cy) then
+      a[2] := false;
+    if (blocks[i].cx = pl.cx + 1) and (blocks[i].cy = pl.cy) then
+      a[3] := false;
+  end;
+  for i := 0 to length(players) - 1 do
+    if players[i] <> pl then
+    begin
+      if (players[i].cx = pl.cx) and (players[i].cy = pl.cy - 1) then
+        a[1] := false;
+      if (players[i].cx = pl.cx) and (players[i].cy = pl.cy + 1) then
+        a[4] := false;
+      if (players[i].cx = pl.cx - 1) and (players[i].cy = pl.cy) then
+        a[2] := false;
+      if (players[i].cx = pl.cx + 1) and (players[i].cy = pl.cy) then
+        a[3] := false;
+    end;
+  findmovements := a;
+end;
+
+function fine(const movements: array_1_4_of_boolean): boolean:= movements[1] or movements[2] or movements[3] or movements[4];
+
+procedure addseg<t>(var a: array of t):= setlength(a, length(a) + 1);
+
+procedure addblock(var blocks: ablocks; const pl: player);
+begin
+  addseg(blocks);
+  blocks[length(blocks) - 1] := new block(pl.cx, pl.cy, pl.num, pl);
+end;
+
+///нахождение количества свободных клеток
+function findspace(const sx, sy: integer; const blocks: ablocks; const players: aplayers): integer;
+var
+  c, i: integer;
+  m: array [minx..maxx, miny..maxy] of boolean;
+  a: array of array [1..2] of integer;
+begin
+  c := 0;
+  for i := 0 to length(blocks) - 1 do
+    m[blocks[i].cx, blocks[i].cy] := true;
+  for i := 0 to length(players) - 1 do
+    m[players[i].cx, players[i].cy] := true;
+  setlength(a, 1);
+  a[0][1] := sx;
+  a[0][2] := sy;
+  while length(a) > 0 do
+  begin
+    if (a[0][2] - 1 >= miny) and not m[a[0][1], a[0][2] - 1] then
+    begin
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1];
+      a[length(a) - 1][2] := a[0][2] - 1;
+    end;
+    if (a[0][2] + 1 <= maxy) and not m[a[0][1], a[0][2] + 1] then
+    begin
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1];
+      a[length(a) - 1][2] := a[0][2] + 1;
+    end;
+    if (a[0][1] - 1 >= minx) and not m[a[0][1] - 1, a[0][2]] then
+    begin
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1] - 1;
+      a[length(a) - 1][2] := a[0][2];
+    end;
+    if (a[0][1] + 1 <= maxx) and not m[a[0][1] + 1, a[0][2]] then
+    begin
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1] + 1;
+      a[length(a) - 1][2] := a[0][2];
+    end;
+    c += 1;
+    m[a[0][1], a[0][2]] := true;
+    for i := 0 to length(a) - 2 do
+      a[i] := a[i + 1];
+    setlength(a, length(a) - 1);
+  end;
+  findspace := c;
+end;
+
+function movecount(const movement: array_1_4_of_boolean): integer;
+var
+  c: integer;
+begin
+  c := 0;
+  for var i := 1 to 4 do
+    if movement[i] then
+      c += 1;
+  movecount := c;
+end;
+
+///нужно ли решение вопроса куда двигатьсяили нет
+function deside(const movement: array_1_4_of_boolean; const pl: player; const blocks: ablocks; const players: aplayers): boolean;
+var
+  i, sx, sy, si, fi, fx, fy: integer;//цикловая, стартовые коорждинаты, стартовое направление а так же конечные координаты и направление
+  m: array [minx..maxx, miny..maxy] of boolean;
+  a: array of array [1..2] of integer;
+
+begin
+  //волновой алгоритм для определения, можно ли из первой клетки прийти во вторую.
+  for i := 0 to length(blocks) - 1 do
+    m[blocks[i].cx, blocks[i].cy] := true;
+  for i := 0 to length(players) - 1 do
+    m[players[i].cx, players[i].cy] := true;
+  setlength(a, 1);//устанавливаем старт
+  for i := 1 to 4 do
+    if movement[i] then
+    begin
+      case i of
+        1:
+          begin
+            sx := pl.cx;
+            sy := pl.cy - 1;
+          end;
+        2:
+          begin
+            sx := pl.cx - 1;
+            sy := pl.cy;
+          end;
+        3:
+          begin
+            sx := pl.cx + 1;
+            sy := pl.cy;
+          end;
+        4:
+          begin
+            sx := pl.cx;
+            sy := pl.cy + 1;
+          end;
+      end;
+      si := i;
+    end;
+  a[0][1] := sx;
+  a[0][2] := sy;
+  //устанавливаем конец
+  for i := 1 to 4 do
+    if movement[i] and (i <> si) then
+      fi := i;
+  case fi of
+    1:
+      begin
+        fx := pl.cx;
+        fy := pl.cy - 1;
+      end;
+    2:
+      begin
+        fx := pl.cx - 1;
+        fy := pl.cy;
+      end;
+    3:
+      begin
+        fx := pl.cx + 1;
+        fy := pl.cy;
+      end;
+    4:
+      begin
+        fx := pl.cx;
+        fy := pl.cy + 1;
+      end;
+  end;
+  m[a[0][1], a[0][2]] := true;
+  while (length(a) > 0) and not m[fx, fy] do
+  begin
+    if (a[0][2] - 1 >= miny) and not m[a[0][1], a[0][2] - 1] then
+    begin
+      m[a[0][1], a[0][2] - 1] := true;
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1];
+      a[length(a) - 1][2] := a[0][2] - 1;
+    end;
+    if (a[0][2] + 1 <= maxy) and not m[a[0][1], a[0][2] + 1] then
+    begin
+      m[a[0][1], a[0][2] + 1] := true;
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1];
+      a[length(a) - 1][2] := a[0][2] + 1;
+    end;
+    if (a[0][1] - 1 >= minx) and not m[a[0][1] - 1, a[0][2]] then
+    begin
+      m[a[0][1] - 1, a[0][2]] := true;
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1] - 1;
+      a[length(a) - 1][2] := a[0][2];
+    end;
+    if (a[0][1] + 1 <= maxx) and not m[a[0][1] + 1, a[0][2]] then
+    begin
+      m[a[0][1] + 1, a[0][2]] := true;
+      setlength(a, length(a) + 1);
+      a[length(a) - 1][1] := a[0][1] + 1;
+      a[length(a) - 1][2] := a[0][2];
+    end;
+    for i := 0 to length(a) - 2 do
+      a[i] := a[i + 1];
+    setlength(a, length(a) - 1);
+  end;
+  deside := not m[fx, fy];
+end;
+
+function wavecount(const w: aw): integer;
+var
+  c: integer;
+begin
+  c := 0;
+  for var i := 1 to 4 do
+    if length(w[i]) > 0 then
+      c += 1;
+  wavecount := c;
+end;
+
+//найти пересечение волн
+function findstup(const pl: player; const m: am): boolean:=
+((pl.cx - 1 >= minx) and (m[1][pl.cx - 1][pl.cy] or m[3][pl.cx - 1][pl.cy] or m[4][pl.cx - 1][pl.cy])) or
+((pl.cy - 1 >= miny) and (m[2][pl.cx][pl.cy - 1] or m[3][pl.cx][pl.cy - 1] or m[4][pl.cx][pl.cy - 1])) or
+((pl.cx + 1 <= maxx) and (m[1][pl.cx + 1][pl.cy] or m[2][pl.cx + 1][pl.cy] or m[4][pl.cx + 1][pl.cy])) or
+((pl.cy + 1 <= maxy) and (m[1][pl.cx][pl.cy + 1] or m[2][pl.cx][pl.cy + 1] or m[3][pl.cx][pl.cy + 1]));
+
+procedure breakstup(var movement: array_1_4_of_boolean; const pl: player; const m: am);
+begin
+  if (((pl.cx - 1 >= minx) and m[1][pl.cx - 1][pl.cy]) or
+((pl.cx + 1 <= maxx) and m[1][pl.cx + 1][pl.cy]) or
+((pl.cy + 1 <= maxy) and m[1][pl.cx][pl.cy + 1])) and (movecount(movement) > 1) then
+    movement[1] := false;
+  if (((pl.cy - 1 >= miny) and m[2][pl.cx][pl.cy - 1]) or
+ ((pl.cx + 1 <= maxx) and m[2][pl.cx + 1][pl.cy]) or
+ ((pl.cy + 1 <= maxy) and m[2][pl.cx][pl.cy + 1])) and (movecount(movement) > 1) then
+    movement[2] := false;
+  if (((pl.cx - 1 >= minx) and m[3][pl.cx - 1][pl.cy]) or
+ ((pl.cy - 1 >= miny) and m[3][pl.cx][pl.cy - 1]) or
+ ((pl.cy + 1 <= maxy) and m[3][pl.cx][pl.cy + 1])) and (movecount(movement) > 1) then
+    movement[3] := false;
+  if (((pl.cx - 1 >= minx) and m[4][pl.cx - 1][pl.cy]) or
+ ((pl.cy - 1 >= miny) and m[4][pl.cx][pl.cy - 1]) or
+ ((pl.cx + 1 <= maxx) and m[4][pl.cx + 1][pl.cy])) and (movecount(movement) > 1) then
+    movement[4] := false;
+end;
+
+function startrun(movement: array_1_4_of_boolean; const pl: player; const blocks: ablocks; const players: aplayers): integer;
+var
+  i, ii, bw: integer;//цикловая 1 и 2,решение
+  m: am;//карты
+  w: aw;//волны
+  res: array_1_4_of_boolean;
+
+begin
+  //волновой алгоритм для определения, где тупик быстрее
+  for ii := 1 to 4 do
+    if movement[ii] then
+    begin
+      for i := 0 to length(blocks) - 1 do
+        m[ii][blocks[i].cx, blocks[i].cy] := true;
+      for i := 0 to length(players) - 1 do
+        m[ii][players[i].cx, players[i].cy] := true;
+      setlength(w[ii], 1);
+      w[ii][0][1] := pl.cx;
+      w[ii][0][2] := pl.cy;
+    end;
+  if movement[1] then
+    w[1][0][2] -= 1;
+  if movement[2] then
+    w[2][0][1] -= 1;
+  if movement[3] then
+    w[3][0][1] += 1;
+  if movement[4] then
+    w[4][0][2] += 1;
+  if pl.cy - 1 > miny then
+    m[1][pl.cx][pl.cy - 1] := true;
+  if pl.cx - 1 > minx then
+    m[2][pl.cx - 1][pl.cy] := true;
+  if pl.cx + 1 < maxx then
+    m[3][pl.cx + 1][pl.cy] := true;
+  if pl.cy + 1 < maxy then
+    m[4][pl.cx][pl.cy + 1] := true;
+  for i := 1 to 4 do
+    if movement[i] then
+      m[i][pl.cx, pl.cy] := true;
+  while (wavecount(w) > 1) and (movecount(movement) > 1) do
+  begin
+    for i := 1 to 4 do
+      if movement[i] then
+      begin
+        if (w[i][0][2] - 1 >= miny) and not m[i][w[i][0][1], w[i][0][2] - 1] then
+        begin
+          m[i][w[i][0][1], w[i][0][2] - 1] := true;
+          setlength(w[i], length(w[i]) + 1);
+          w[i][length(w[i]) - 1][1] := w[i][0][1];
+          w[i][length(w[i]) - 1][2] := w[i][0][2] - 1;
+        end;
+        if (w[i][0][2] + 1 <= maxy) and not m[i][w[i][0][1], w[i][0][2] + 1] then
+        begin
+          m[i][w[i][0][1], w[i][0][2] + 1] := true;
+          setlength(w[i], length(w[i]) + 1);
+          w[i][length(w[i]) - 1][1] := w[i][0][1];
+          w[i][length(w[i]) - 1][2] := w[i][0][2] + 1;
+        end;
+        if (w[i][0][1] - 1 >= minx) and not m[i][w[i][0][1] - 1, w[i][0][2]] then
+        begin
+          m[i][w[i][0][1] - 1, w[i][0][2]] := true;
+          setlength(w[i], length(w[i]) + 1);
+          w[i][length(w[i]) - 1][1] := w[i][0][1] - 1;
+          w[i][length(w[i]) - 1][2] := w[i][0][2];
+        end;
+        if (w[i][0][1] + 1 <= maxx) and not m[i][w[i][0][1] + 1, w[i][0][2]] then
+        begin
+          m[i][w[i][0][1] + 1, w[i][0][2]] := true;
+          setlength(w[i], length(w[i]) + 1);
+          w[i][length(w[i]) - 1][1] := w[i][0][1] + 1;
+          w[i][length(w[i]) - 1][2] := w[i][0][2];
+        end;
+        for ii := 0 to length(w[i]) - 2 do
+          w[i][ii] := w[i][ii + 1];
+        setlength(w[i], length(w[i]) - 1);
+      end;
+    if findstup(pl, m) then
+      breakstup(movement, pl, m);
+  end;
+  for i := 1 to 4 do
+    res[i] := movement[i] or ((length(w[i]) > 0) and (movecount(movement)>1));
+  if movecount(res) = 1 then
+  begin
+    for i := 1 to 4 do
+      if res[i] then
+        bw := i;
+  end
+  else
+  begin
+    bw := random(1, 4);
+    while not res[bw] do
+    begin
+      bw += 1;
+      if bw = 5 then
+        bw := 1;
+    end;
+  end;
+  startrun := bw;
+end;
+
+
+var
+  i, ii, moveside, bestch: integer;//цикловые 1-го и 2-го порядка, направление движения, лучший вариант движения
+  movement: array_1_4_of_boolean;//возможность двигаться
+  space: array_1_4_of_integer;//количество свободных клеток в этих направлениях
+
+begin
+  graphabc.InitWindow(graphabc.screenWidth div 4, graphabc.ScreenHeight div 4, graphabc.ScreenWidth div 2, graphabc.ScreenHeight div 2);
+  graphabc.setWindowIsFixedSize(true);
+  graphabc.SetWindowCaption('game_04_01');
+  graphabc.SetFontColor(rgb(0, 0, 0));
+  graphabc.setbrushstyle(bsHatch);
+  graphabc.LockDrawing;
+  graphabc.onkeydown := prkeydown;
+  graphabc.onkeyup := prkeyup;
+  randomize;
+  setlength(players, playerscount);
+  for i := 0 to length(players) - 1 do
+    players[i] := new player(random(minx, maxx), random(miny, maxy), 0, random(1, maxcolor));
+  while not keyesc do
+  begin
+    i := length(players) - 1;
+    while not keyesc and (i >= 0) do//по всем игрокам
+    begin
+      if players[i] <> nil then
+      begin
+        movement := findmovements(players[i], blocks, players);//ищем возможность движения
+        addblock(blocks, players[i]);//закрываем блок на котором стоит
+        if fine(movement) then//если можно двигаться
+        begin
+          moveside := startrun(movement, players[i], blocks, players);
+          case moveside of//двигемся
+            1: players[i].cy -= 1;
+            4: players[i].cy += 1;
+            2: players[i].cx -= 1;
+            3: players[i].cx += 1;
+          end;
+          players[i].num += 1;
+        end
+        else
+        begin//удаляем
+          //graphabc.setconsoleio;
+          //writeln(players[i].cx, ' ', players[i].cy, ' ', players[i].num, ' ', colorid(players[i].cl));
+          players[i].alive := false;
+          for ii := i to length(players) - 2 do
+            players[ii] := players[ii + 1];
+          setlength(players, length(players) - 1);
+        end;
+        background;//рисуем фон
+        for ii := 0 to length(blocks) - 1 do//блоки
+          drawblock(blocks[ii]);
+        for ii := 0 to length(players) - 1 do
+          drawplayer(players[ii]);//игроки
+        redraw;
+        sleep(sleeptime);
+      end;
+      i -= 1;
+    end;
+  end;
+end.
