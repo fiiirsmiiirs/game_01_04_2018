@@ -1,11 +1,11 @@
 uses graphabc;
 
 const
-  ///перерыв
+  ///a delay
   sleeptime = 0;
-  ///количество игроков
+  ///a count of players
   playerscount =5;
-  ///границы
+  ///borders
   minx = 1;
   ///--
   miny = 1;
@@ -13,27 +13,27 @@ const
   maxx = 18;
   ///--
   maxy = 21;
-  ///количество цветов
+  ///a count of colors
   maxcolor = 10;
-  ///алфавит
+  ///the alphabet
   alphabet = 'abcdefghijklmnopqrstuvwxyz';
-  ///основание системы счисления
+  ///the basis of the calculation system
   n = length(alphabet);
-  ///цвет стены
+  ///a wall color
   wallcolor = graphabc.clRed;
 
 var
   blocksize: integer := 15;
-  ///смещение по горизонтали
+  ///the horizontal offset
   dx: integer := 2;
-  ///смещение по вертикали
+  ///the vertical offset
   dy: integer := 2;
-  ///увеличение
+  ///a scale
   scale: real := 1;
-  ///события
+  ///events
   keyesc, keya, keyw, keys, keyd, keyleft, keyright, keyup, keydown: boolean;
 
-///функция превращения числа в цвет
+///trasfer a number of color into a color
 function colorid(const i: integer): color;
 begin
   case i of
@@ -51,41 +51,41 @@ begin
 end;
 
 
-///преобразование 10-я система счисления - n-я система счисления
+///traformation 10 to n system of calculation
 function toabc(i: integer): string;
 var
-  s: string;//строка ответа
+  s: string;//answer string
   f: boolean;
 begin
   f := true;
-  while (i <> 0) or f do//пока не ноль
+  while (i <> 0) or f do
   begin
     f := false;
-    if i mod n >= 0 then//если ещё делим дальше
+    if i mod n >= 0 then
       f := true;
-    s += copy(alphabet, i mod n + 1, 1);//добавляем букву
-    i := i div n;//убираем добавленное
-    if f then//если продолжаем делить
-      i -= 1;//уменьшаем параметр
+    s += copy(alphabet, i mod n + 1, 1);
+    i := i div n;
+    if f then
+      i -= 1;
   end;
-  delete(s, length(s), 1);//удаляем лишнюю а
-  for var ii := 1 to length(s) div 2 do//поворот строки
+  delete(s, length(s), 1);
+  for var ii := 1 to length(s) div 2 do
     swap(s[ii], s[length(s) - ii + 1]);
   toabc := s;
 end;
 
 type
-  ///игрок
+  ///player
   player = class
-    ///цвет
+    ///a color
     cl: integer;
-    ///координата горизонтали
+    ///horizontal coordinate
     cx: integer;
-    ///координата вертикали
+    ///vertical coordinate
     cy: integer;
-    ///число на блоке
+    ///a number on the block
     num: integer;
-    ///живость
+    ///is the player aalive
     alive: boolean;
     constructor(const ncx, ncy, nnum, ncl: integer);
     begin
@@ -96,15 +96,15 @@ type
       alive := true;
     end;
   end;
-  ///блок поля.
+  ///a block of the box
   block = class
-    ///координата горизонтали
+    ///horizontal coordinate
     cx: integer;
-    ///координата вертикали
+    ///vertical coordinate
     cy: integer;
-    ///число на блоке
+    ///a number on the block
     num: integer;
-    ///владелец
+    ///an owner
     id: player;
     constructor(const ncx, ncy, nnum: integer; const nid: player);
     begin
@@ -122,11 +122,8 @@ type
   am = array [1..4] of array [minx..maxx, miny..maxy] of boolean;
 
 var
-  ///блоки поля
   blocks: ablocks;
-  ///игроки
   players: aplayers;
-  ///размер блоков
 
 procedure prkeydown(const key: integer);
 begin
@@ -313,20 +310,20 @@ begin
   movecount := c;
 end;
 
-///нужно ли решение вопроса куда двигатьсяили нет
+///a disition about what to do next
 function deside(const movement: array_1_4_of_boolean; const pl: player; const blocks: ablocks; const players: aplayers): boolean;
 var
-  i, sx, sy, si, fi, fx, fy: integer;//цикловая, стартовые коорждинаты, стартовое направление а так же конечные координаты и направление
+  i, sx, sy, si, fi, fx, fy: integer;
   m: array [minx..maxx, miny..maxy] of boolean;
   a: array of array [1..2] of integer;
 
 begin
-  //волновой алгоритм для определения, можно ли из первой клетки прийти во вторую.
+  //wave algoriphm to find out were is a way from the first to the second cell 
   for i := 0 to length(blocks) - 1 do
     m[blocks[i].cx, blocks[i].cy] := true;
   for i := 0 to length(players) - 1 do
     m[players[i].cx, players[i].cy] := true;
-  setlength(a, 1);//устанавливаем старт
+  setlength(a, 1);//set a start
   for i := 1 to 4 do
     if movement[i] then
     begin
@@ -356,7 +353,7 @@ begin
     end;
   a[0][1] := sx;
   a[0][2] := sy;
-  //устанавливаем конец
+  //set an end
   for i := 1 to 4 do
     if movement[i] and (i <> si) then
       fi := i;
@@ -431,7 +428,7 @@ begin
   wavecount := c;
 end;
 
-//найти пересечение волн
+//find a collusion of waves
 function findstup(const pl: player; const m: am): boolean:=
 ((pl.cx - 1 >= minx) and (m[1][pl.cx - 1][pl.cy] or m[3][pl.cx - 1][pl.cy] or m[4][pl.cx - 1][pl.cy])) or
 ((pl.cy - 1 >= miny) and (m[2][pl.cx][pl.cy - 1] or m[3][pl.cx][pl.cy - 1] or m[4][pl.cx][pl.cy - 1])) or
@@ -460,13 +457,13 @@ end;
 
 function startrun(movement: array_1_4_of_boolean; const pl: player; const blocks: ablocks; const players: aplayers): integer;
 var
-  i, ii, bw: integer;//цикловая 1 и 2,решение
-  m: am;//карты
-  w: aw;//волны
+  i, ii, bw: integer;
+  m: am;
+  w: aw;
   res: array_1_4_of_boolean;
 
 begin
-  //волновой алгоритм для определения, где тупик быстрее
+  //wave algorithm to find where is a deadlock
   for ii := 1 to 4 do
     if movement[ii] then
     begin
@@ -560,9 +557,9 @@ end;
 
 
 var
-  i, ii, moveside, bestch: integer;//цикловые 1-го и 2-го порядка, направление движения, лучший вариант движения
-  movement: array_1_4_of_boolean;//возможность двигаться
-  space: array_1_4_of_integer;//количество свободных клеток в этих направлениях
+  i, ii, moveside, bestch: integer;
+  movement: array_1_4_of_boolean;
+  space: array_1_4_of_integer;
 
 begin
   graphabc.InitWindow(graphabc.screenWidth div 4, graphabc.ScreenHeight div 4, graphabc.ScreenWidth div 2, graphabc.ScreenHeight div 2);
@@ -580,16 +577,16 @@ begin
   while not keyesc do
   begin
     i := length(players) - 1;
-    while not keyesc and (i >= 0) do//по всем игрокам
+    while not keyesc and (i >= 0) do// chek all the players
     begin
       if players[i] <> nil then
       begin
-        movement := findmovements(players[i], blocks, players);//ищем возможность движения
-        addblock(blocks, players[i]);//закрываем блок на котором стоит
-        if fine(movement) then//если можно двигаться
+        movement := findmovements(players[i], blocks, players);// a finding of movement
+        addblock(blocks, players[i]);//close the block under its legs
+        if fine(movement) then// if it can move
         begin
           moveside := startrun(movement, players[i], blocks, players);
-          case moveside of//двигемся
+          case moveside of//move
             1: players[i].cy -= 1;
             4: players[i].cy += 1;
             2: players[i].cx -= 1;
@@ -598,7 +595,7 @@ begin
           players[i].num += 1;
         end
         else
-        begin//удаляем
+        begin//delete
           //graphabc.setconsoleio;
           //writeln(players[i].cx, ' ', players[i].cy, ' ', players[i].num, ' ', colorid(players[i].cl));
           players[i].alive := false;
@@ -606,11 +603,11 @@ begin
             players[ii] := players[ii + 1];
           setlength(players, length(players) - 1);
         end;
-        background;//рисуем фон
-        for ii := 0 to length(blocks) - 1 do//блоки
+        background;//draw a background
+        for ii := 0 to length(blocks) - 1 do//blocks
           drawblock(blocks[ii]);
         for ii := 0 to length(players) - 1 do
-          drawplayer(players[ii]);//игроки
+          drawplayer(players[ii]);//players
         redraw;
         sleep(sleeptime);
       end;
